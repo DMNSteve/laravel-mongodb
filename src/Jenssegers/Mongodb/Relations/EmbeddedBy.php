@@ -88,7 +88,7 @@ class EmbeddedBy extends BelongsTo
      */
     public function getResults()
     {
-        return $this->query->first() ?: $this->getDefaultFor($this->parent);
+        return $this->related;
     }
 
     /**
