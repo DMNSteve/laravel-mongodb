@@ -90,4 +90,16 @@ class EmbeddedBy extends BelongsTo
     {
         return $this->query->first() ?: $this->getDefaultFor($this->parent);
     }
+
+    /**
+     * Touch all of the related models for the relationship.
+     *
+     * @return void
+     */
+    public function touch()
+    {
+        $column = $this->getRelated()->getUpdatedAtColumn();
+
+        $this->update([$column => $this->getRelated()->freshTimestampString()]);
+    }
 }
