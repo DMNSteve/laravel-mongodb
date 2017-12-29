@@ -136,9 +136,11 @@ abstract class Model extends BaseModel
             return $this->getAttributeValue($key);
         }
 
+        $camelKey = camel_case($key);
+
         // This checks for embedded relation support.
-        if (method_exists($this, $key) && !method_exists(self::class, $key)) {
-            return $this->getRelationValue($key);
+        if (method_exists($this, $camelKey) && !method_exists(self::class, $camelKey)) {
+            return $this->getRelationValue($camelKey);
         }
 
         return parent::getAttribute($key);
