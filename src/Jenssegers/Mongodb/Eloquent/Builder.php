@@ -2,8 +2,10 @@
 
 namespace Jenssegers\Mongodb\Eloquent;
 
+use Closure;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Jenssegers\Mongodb\Helpers\QueriesRelationships;
+use Jenssegers\Mongodb\Relations\EmbedsOneOrMany;
 use MongoDB\Driver\Cursor;
 use MongoDB\Model\BSONDocument;
 
@@ -183,5 +185,16 @@ class Builder extends EloquentBuilder
     public function getConnection()
     {
         return $this->query->getConnection();
+    }
+
+    protected function eagerLoadRelation(array $models, $name, Closure $constraints)
+    {
+        $relation = $this->getRelation($name);
+
+        if ($relation instanceof EmbedsOneOrMany) {
+            return $relation;
+        }
+
+        return parent::eagerLoadRelation($models, $name, $constraints);
     }
 }
