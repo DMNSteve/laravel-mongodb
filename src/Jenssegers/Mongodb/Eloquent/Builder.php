@@ -192,7 +192,7 @@ class Builder extends EloquentBuilder
         $relation = $this->getRelation($name);
 
         if ($relation instanceof EmbedsOneOrMany) {
-            return $relation;
+            return $models;
         }
 
         return parent::eagerLoadRelation($models, $name, $constraints);
