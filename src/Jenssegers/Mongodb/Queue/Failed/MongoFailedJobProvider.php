@@ -44,7 +44,7 @@ class MongoFailedJobProvider extends DatabaseFailedJobProvider
      * Get a single failed job.
      *
      * @param  mixed $id
-     * @return array
+     * @return object
      */
     public function find($id)
     {
@@ -52,7 +52,7 @@ class MongoFailedJobProvider extends DatabaseFailedJobProvider
 
         $job['id'] = (string) $job['_id'];
 
-        return $job;
+        return (object) $job;
     }
 
     /**
