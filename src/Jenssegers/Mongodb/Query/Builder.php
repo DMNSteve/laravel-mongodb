@@ -152,6 +152,8 @@ class Builder extends BaseBuilder
             $version = filter_var(explode(')', $version)[0], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION); // lumen
             return version_compare($version, '5.3', '>=');
         }
+
+        return true;
     }
 
     /**
@@ -932,6 +934,12 @@ class Builder extends BaseBuilder
                         $where['value'] = new UTCDateTime($where['value']->getTimestamp() * 1000);
                     }
                 }
+            } elseif (isset($where['values'])) {
+                array_walk_recursive($where['values'], function (&$item, $key) {
+                    if ($item instanceof DateTime) {
+                        $item = new UTCDateTime($item->getTimestamp() * 1000);
+                    }
+                });
             }
 
             // The next item in a "chain" of wheres devices the boolean of the

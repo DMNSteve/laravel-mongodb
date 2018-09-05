@@ -26,7 +26,7 @@ class MongoFailedJobProvider extends DatabaseFailedJobProvider
     /**
      * Get a list of all of the failed jobs.
      *
-     * @return array
+     * @return object[]
      */
     public function all()
     {
@@ -34,7 +34,7 @@ class MongoFailedJobProvider extends DatabaseFailedJobProvider
 
         $all = array_map(function ($job) {
             $job['id'] = (string) $job['_id'];
-            return $job;
+            return (object) $job;
         }, $all);
 
         return $all;
