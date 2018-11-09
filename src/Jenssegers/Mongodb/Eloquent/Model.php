@@ -81,7 +81,7 @@ abstract class Model extends BaseModel
 
         // Let Eloquent convert the value to a DateTime instance.
         if (!$value instanceof DateTime) {
-            $value = parent::asDateTime($value);
+            $value = $this->asDateTime($value);
         }
 
         return new UTCDateTime($value->getTimestamp() * 1000);
