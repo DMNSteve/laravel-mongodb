@@ -5,6 +5,7 @@ namespace Jenssegers\Mongodb\Relations;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Concerns\SupportsDefaultModels;
 use MongoDB\BSON\ObjectID;
+use Illuminate\Database\Eloquent\Model as EloquentModel;
 
 class EmbedsOne extends EmbedsOneOrMany
 {
@@ -146,5 +147,17 @@ class EmbedsOne extends EmbedsOneOrMany
     public function newRelatedInstanceFor(Model $parent)
     {
         return $this->related->newInstance();
+    }
+
+    /**
+     * Get the name of the "where in" method for eager loading.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @param  string  $key
+     * @return string
+     */
+    protected function whereInMethod(EloquentModel $model, $key)
+    {
+        return 'whereIn';
     }
 }
