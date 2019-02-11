@@ -150,6 +150,61 @@ class Connection extends BaseConnection
     }
 
     /**
+     * @inheritdoc
+     */
+    public function select($query, $bindings = [], $useReadPdo = false)
+    {
+        $cursor = $this->getCollection($query['collection'])
+            ->find($query['query'], $query['options']);
+
+        return iterator_to_array($cursor, false);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function cursor($query, $bindings = [], $useReadPdo = false)
+    {
+        $collection = $this->getCollection($query['collection']);
+
+        $cursor = $this->getCollection($query['collection'])
+            ->find($query['query'], $query['options']);
+
+        foreach ($cursor as $doc) {
+            yield $doc;
+        }
+    }
+
+    /**
+     * Run an aggregate query
+     *
+     * @param  array $collection
+     * @param  array $pipeline
+     * @param  array $options
+     * @return array
+     */
+    public function aggregate($collection, $pipeline, $options = [])
+    {
+        return iterator_to_array($this->getCollection($collection)->aggregate($pipeline, $options));
+    }
+
+    /**
+     * Run a distinct query
+     *
+     * @return array
+     */
+    public function distinct($collection, $column, $query = [])
+    {
+        $column = isset($this->columns[0]) ? $this->columns[0] : '_id';
+
+        if ($query) {
+            return $this->getCollection($collection)->distinct($column, $query);
+        } else {
+            return $this->getCollection($collection)->distinct($column);
+        }
+    }
+
+    /**
      * Determine if the given configuration array has a dsn string.
      *
      * @param  array  $config
