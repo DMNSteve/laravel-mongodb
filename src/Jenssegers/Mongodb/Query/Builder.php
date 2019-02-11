@@ -60,6 +60,23 @@ class Builder extends BaseBuilder
     public $paginating = false;
 
     /**
+     * Indicate if we are executing a distinct query.
+     *
+     * @var bool
+     */
+    public $distinct = false;
+
+    /**
+     * @var array
+     */
+    public $groups = [];
+
+    /**
+     * @var array
+     */
+    public $aggregate = [];
+
+    /**
      * All of the available clause operators.
      *
      * @var array
@@ -206,197 +223,37 @@ class Builder extends BaseBuilder
     /**
      * @inheritdoc
      */
-    public function get($columns = [])
+    public function runSelect()
     {
-        return $this->getFresh($columns);
+        if ($this->groups || $this->aggregate || $this->paginating) {
+            $compiled = $this->grammar->compileAggregate($this, null);
+
+            return $this->connection->aggregate(
+                $compiled['collection'],
+                $compiled['pipeline'],
+                $compiled['options']
+            );
+        } elseif ($this->distinct) {
+            $compiled = $this->grammar->compileDistinct($this);
+
+            return $this->connection->distinct(
+                $compiled['collection'],
+                $compiled['column'],
+                $compiled['query']
+            );
+        } else {
+            return parent::runSelect();
+        }
     }
 
     /**
-     * Execute the query as a fresh "select" statement.
+     * Get a generator for the given query.
      *
-     * @param  array $columns
-     * @return array|static[]|Collection
+     * @return \Generator
      */
-    public function getFresh($columns = [])
+    public function cursor()
     {
-        // If no columns have been specified for the select statement, we will set them
-        // here to either the passed columns, or the standard default of retrieving
-        // all of the columns on the table using the "wildcard" column character.
-        if (is_null($this->columns)) {
-            $this->columns = $columns;
-        }
-
-        // Drop all columns if * is present, MongoDB does not work this way.
-        if (in_array('*', $this->columns)) {
-            $this->columns = [];
-        }
-
-        // Compile wheres
-        $wheres = $this->compileWheres();
-
-        // Use MongoDB's aggregation framework when using grouping or aggregation functions.
-        if ($this->groups || $this->aggregate || $this->paginating) {
-            $group = [];
-            $unwinds = [];
-
-            // Add grouping columns to the $group part of the aggregation pipeline.
-            if ($this->groups) {
-                foreach ($this->groups as $column) {
-                    $group['_id'][$column] = '$' . $column;
-
-                    // When grouping, also add the $last operator to each grouped field,
-                    // this mimics MySQL's behaviour a bit.
-                    $group[$column] = ['$last' => '$' . $column];
-                }
-
-                // Do the same for other columns that are selected.
-                foreach ($this->columns as $column) {
-                    $key = str_replace('.', '_', $column);
-
-                    $group[$key] = ['$last' => '$' . $column];
-                }
-            }
-
-            // Add aggregation functions to the $group part of the aggregation pipeline,
-            // these may override previous aggregations.
-            if ($this->aggregate) {
-                $function = $this->aggregate['function'];
-
-                foreach ($this->aggregate['columns'] as $column) {
-                    // Add unwind if a subdocument array should be aggregated
-                    // column: subarray.price => {$unwind: '$subarray'}
-                    if (count($splitColumns = explode('.*.', $column)) == 2) {
-                        $unwinds[] = $splitColumns[0];
-                        $column = implode('.', $splitColumns);
-                    }
-
-                    // Translate count into sum.
-                    if ($function == 'count') {
-                        $group['aggregate'] = ['$sum' => 1];
-                    } // Pass other functions directly.
-                    else {
-                        $group['aggregate'] = ['$' . $function => '$' . $column];
-                    }
-                }
-            }
-
-            // When using pagination, we limit the number of returned columns
-            // by adding a projection.
-            if ($this->paginating) {
-                foreach ($this->columns as $column) {
-                    $this->projections[$column] = 1;
-                }
-            }
-
-            // The _id field is mandatory when using grouping.
-            if ($group && empty($group['_id'])) {
-                $group['_id'] = null;
-            }
-
-            // Build the aggregation pipeline.
-            $pipeline = [];
-            if ($wheres) {
-                $pipeline[] = ['$match' => $wheres];
-            }
-
-            // apply unwinds for subdocument array aggregation
-            foreach ($unwinds as $unwind) {
-                $pipeline[] = ['$unwind' => '$' . $unwind];
-            }
-
-            if ($group) {
-                $pipeline[] = ['$group' => $group];
-            }
-
-            // Apply order and limit
-            if ($this->orders) {
-                $pipeline[] = ['$sort' => $this->orders];
-            }
-            if ($this->offset) {
-                $pipeline[] = ['$skip' => $this->offset];
-            }
-            if ($this->limit) {
-                $pipeline[] = ['$limit' => $this->limit];
-            }
-            if ($this->projections) {
-                $pipeline[] = ['$project' => $this->projections];
-            }
-
-            $options = [
-                'typeMap' => ['root' => 'array', 'document' => 'array'],
-            ];
-
-            // Add custom query options
-            if (count($this->options)) {
-                $options = array_merge($options, $this->options);
-            }
-
-            // Execute aggregation
-            $results = iterator_to_array($this->collection->aggregate($pipeline, $options));
-
-            // Return results
-            return $this->useCollections ? new Collection($results) : $results;
-        } // Distinct query
-        elseif ($this->distinct) {
-            // Return distinct results directly
-            $column = isset($this->columns[0]) ? $this->columns[0] : '_id';
-
-            // Execute distinct
-            if ($wheres) {
-                $result = $this->collection->distinct($column, $wheres);
-            } else {
-                $result = $this->collection->distinct($column);
-            }
-
-            return $this->useCollections ? new Collection($result) : $result;
-        } // Normal query
-        else {
-            $columns = [];
-
-            // Convert select columns to simple projections.
-            foreach ($this->columns as $column) {
-                $columns[$column] = true;
-            }
-
-            // Add custom projections.
-            if ($this->projections) {
-                $columns = array_merge($columns, $this->projections);
-            }
-            $options = [];
-
-            // Apply order, offset, limit and projection
-            if ($this->timeout) {
-                $options['maxTimeMS'] = $this->timeout;
-            }
-            if ($this->orders) {
-                $options['sort'] = $this->orders;
-            }
-            if ($this->offset) {
-                $options['skip'] = $this->offset;
-            }
-            if ($this->limit) {
-                $options['limit'] = $this->limit;
-            }
-            if ($columns) {
-                $options['projection'] = $columns;
-            }
-            // if ($this->hint)    $cursor->hint($this->hint);
-
-            // Fix for legacy support, converts the results to arrays instead of objects.
-            $options['typeMap'] = ['root' => 'array', 'document' => 'array'];
-
-            // Add custom query options
-            if (count($this->options)) {
-                $options = array_merge($options, $this->options);
-            }
-
-            // Execute query and get MongoCursor
-            $cursor = $this->collection->find($wheres, $options);
-
-            // Return results as an array with numeric keys
-            $results = iterator_to_array($cursor, false);
-            return $this->useCollections ? new Collection($results) : $results;
-        }
+        return $this->connection->cursor($this->grammar->compileSelect($this));
     }
 
     /**
