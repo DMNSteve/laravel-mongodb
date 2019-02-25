@@ -60,6 +60,13 @@ class Builder extends BaseBuilder
     public $paginating = false;
 
     /**
+     * Indicate if we should return the cursor from a get().
+     *
+     * @var bool
+     */
+    public $cursor = false;
+
+    /**
      * All of the available clause operators.
      *
      * @var array
@@ -393,6 +400,11 @@ class Builder extends BaseBuilder
             // Execute query and get MongoCursor
             $cursor = $this->collection->find($wheres, $options);
 
+            // Just return the cursor if required
+            if ($this->cursor) {
+                return $cursor;
+            }
+
             // Return results as an array with numeric keys
             $results = iterator_to_array($cursor, false);
             return $this->useCollections ? new Collection($results) : $results;
@@ -473,6 +485,18 @@ class Builder extends BaseBuilder
         }
 
         return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function cursor($columns = [])
+    {
+        $this->cursor = true;
+
+        foreach ($this->get($columns) as $doc) {
+            yield $doc;
+        }
     }
 
     /**
